@@ -248,6 +248,14 @@ if [ ! -f "$KEYSTORE_DIR/android.keystore" ] || [ ! -f "$KEYSTORE_DIR/bundle.key
     cp "$KEYSTORE_DIR/android.keystore" "$KEYSTORE_DIR/bundle.keystore"
 fi
 
+# RAPT always looks for the keystores at the project root, so mirror the
+# selected key directory into the project before invoking it.
+for f in android.keystore bundle.keystore; do
+    if [ ! -f "$PROJECT/$f" ] || ! cmp -s "$KEYSTORE_DIR/$f" "$PROJECT/$f"; then
+        cp -f "$KEYSTORE_DIR/$f" "$PROJECT/$f"
+    fi
+done
+
 [ -f "$PROJECT/android.json" ] || die "no android.json in $PROJECT (run scripts/prepare.py first)"
 
 # --------------------------------------------------------------------------- #
