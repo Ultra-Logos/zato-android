@@ -39,7 +39,9 @@ def probe(url):
             if total is None:
                 cl = r.headers.get("Content-Length")
                 total = int(cl) if cl and r.status == 200 else None
-            accept = r.headers.get("Accept-Ranges", "").lower() == "bytes"
+            # Some nginx mirrors honour Range requests but do not advertise
+            # Accept-Ranges; a 206 response proves range support.
+            accept = r.status == 206 or r.headers.get("Accept-Ranges", "").lower() == "bytes"
             return total, accept
     except Exception as exc:  # noqa: BLE001 - best effort probe
         print(f"  probe failed ({exc}); using single stream", file=sys.stderr)

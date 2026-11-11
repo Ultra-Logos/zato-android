@@ -97,13 +97,31 @@ log "Using Java $JAVA_VERSION ($JAVA_HOME)"
 SDK_DIR="$CACHE/renpy-$RENPY_VERSION"
 FETCH="python3 $SCRIPT_DIR/fetch.py"
 
-fetch() { # fetch URL DEST
-    local url="$1" dest="$2"
+export FETCH_CONNECTIONS="${FETCH_CONNECTIONS:-32}"
+
+# update.renpy.org serves a certificate that does not cover that host name, so
+# plain HTTPS verification fails there.  www.renpy.org carries the same files
+# under /dl/ with a valid certificate and Range support, so it is tried first
+# and the original host is kept as a plain-HTTP fallback.
+RENPY_DL="https://www.renpy.org/dl/$RENPY_VERSION"
+RENPY_DL_FALLBACK="http://update.renpy.org/$RENPY_VERSION"
+
+fetch() { # fetch DEST URL [FALLBACK_URL ...]
+    local dest="$1" url
+    shift
     if [ -s "$dest" ]; then
         log "Using cached $(basename "$dest")"
         return
     fi
-    $FETCH "$url" "$dest"
+    for url in "$@"; do
+        log "Downloading $url"
+        if $FETCH "$url" "$dest"; then
+            return
+        fi
+        log "Download failed from $url; trying the next source"
+        rm -f "$dest"
+    done
+    die "Could not download $(basename "$dest")"
 }
 
 if [ ! -d "$SDK_DIR/renpy" ]; then
@@ -111,7 +129,7 @@ if [ ! -d "$SDK_DIR/renpy" ]; then
         zip="$SDK_ZIP"
     else
         zip="$CACHE/renpy-$RENPY_VERSION-sdk.zip"
-        fetch "https://update.renpy.org/$RENPY_VERSION/renpy-$RENPY_VERSION-sdk.zip" "$zip"
+        fetch "$zip" "$RENPY_DL/renpy-$RENPY_VERSION-sdk.zip" "$RENPY_DL_FALLBACK/renpy-$RENPY_VERSION-sdk.zip"
     fi
     unzip -t "$zip" >/dev/null || die "$zip is corrupt (delete it and retry)"
     log "Extracting Ren'Py SDK ..."
@@ -134,9 +152,9 @@ if [ ! -d "$SDK_DIR/rapt/buildlib" ]; then
     else
         zip="$CACHE/renpy-$RENPY_VERSION-rapt.zip"
         if [ ! -s "$zip" ]; then
-            # update.renpy.org has no working range support for every mirror,
-            # fetch.py falls back to a single stream if needed.
-            $FETCH "https://update.renpy.org/$RENPY_VERSION/renpy-$RENPY_VERSION-rapt.zip" "$zip"
+            # fetch.py falls back to a single stream when the mirror has no
+            # range support.
+            fetch "$zip" "$RENPY_DL/renpy-$RENPY_VERSION-rapt.zip" "$RENPY_DL_FALLBACK/renpy-$RENPY_VERSION-rapt.zip"
         fi
     fi
     unzip -t "$zip" >/dev/null || die "$zip is corrupt (delete it and retry)"
@@ -154,7 +172,7 @@ if [ ! -d "$SDKROOT/platforms/android-36" ] || [ ! -d "$BUILD_TOOLS" ] || [ ! -d
     if [ ! -x "$SDKROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
         zip="$CACHE/commandlinetools-linux-11076708_latest.zip"
         if [ ! -s "$zip" ]; then
-            fetch "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" "$zip"
+            fetch "$zip" "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
         fi
         log "Installing Android command line tools ..."
         rm -rf "$SDKROOT/cmdline-tools/.tmp"
