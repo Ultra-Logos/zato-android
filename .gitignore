@@ -1,0 +1,24 @@
+# build artifacts and caches
+.cache/
+build/
+out/
+vendor/
+project/
+
+# game distribution (must not be committed)
+game.zip
+*.rpa
+*.apk
+*.aab
+
+# signing keys
+*.keystore
+*.jks
+*.pem
+*.p12
+
+# editor / OS noise
+.DS_Store
+*.swp
+__pycache__/
+*.pyc

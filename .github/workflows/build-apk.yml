@@ -1,0 +1,86 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      game_url:
+        description: >-
+          Direct download URL of the Z.A.T.O. distribution zip.
+          Leave empty to use the GAME_URL repository secret.
+        required: false
+        type: string
+      package:
+        description: Android application id
+        required: false
+        default: org.zato.android
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  RENPY_VERSION: "8.5.3"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Pillow
+        run: python3 -m pip install --disable-pip-version-check pillow
+
+      - name: Cache Ren'Py SDK, RAPT, Android SDK and Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/renpy-${{ env.RENPY_VERSION }}
+            .cache/gradle-home
+          key: renpy-${{ env.RENPY_VERSION }}-${{ runner.os }}-${{ hashFiles('scripts/build.sh') }}
+          restore-keys: |
+            renpy-${{ env.RENPY_VERSION }}-${{ runner.os }}-
+
+      - name: Download the game distribution
+        env:
+          GAME_URL_INPUT: ${{ inputs.game_url }}
+          GAME_URL_SECRET: ${{ secrets.GAME_URL }}
+        run: |
+          url="${GAME_URL_INPUT:-$GAME_URL_SECRET}"
+          if [ -z "$url" ]; then
+            echo "::error::No game URL. Pass the 'game_url' input or set the GAME_URL secret."
+            exit 1
+          fi
+          echo "Downloading $url"
+          curl -fL --retry 3 --retry-delay 5 -o game.zip "$url"
+          ls -lh game.zip
+
+      - name: Prepare project
+        run: |
+          python3 scripts/prepare.py \
+            --source game.zip \
+            --out build/project \
+            --package "${{ inputs.package }}"
+
+      - name: Build APK
+        run: bash scripts/build.sh --project build/project --out build/out
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: zato-android-apk
+          path: build/out/*.apk
+          if-no-files-found: error
+          retention-days: 30
