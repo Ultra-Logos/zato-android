@@ -74,8 +74,23 @@ jobs:
             --out build/project \
             --package "${{ inputs.package }}"
 
+      - name: Prepare key directory
+        run: mkdir -p .cache/keys
+
+      # Keep the signing key stable across runs, otherwise every build gets a
+      # fresh certificate and the new APK cannot be installed over the old one.
+      - name: Cache signing keys
+        uses: actions/cache@v4
+        with:
+          path: .cache/keys
+          key: zato-signing-keys-v1
+
       - name: Build APK
-        run: bash scripts/build.sh --project build/project --out build/out
+        run: |
+          bash scripts/build.sh \
+            --project build/project \
+            --out build/out \
+            --keys .cache/keys
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

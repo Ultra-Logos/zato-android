@@ -218,6 +218,13 @@ itch.io 的下载链接通常与会话绑定，不适合直接用于 CI。建议
 （PKCS#12，alias 与口令均为 `android`）。如需长期维护同一签名的更新，
 可通过 `--keys` 指定持久目录并妥善保管。
 
+GitHub Actions 工作流使用 `--keys .cache/keys`，并把该目录存进缓存
+（key `zato-signing-keys-v1`），因此**同一仓库的连续构建签名一致**，新的
+artifact 可以直接覆盖安装。注意两点：
+
+- 缓存被 GitHub 清理后会重新生成密钥，此时需要先卸载旧应用再安装；
+- 密钥仅用于本地/CI 测试分发，不要用于正式发布。
+
 ## 故障排查
 
 | 现象 | 原因与处理 |
@@ -227,7 +234,7 @@ itch.io 的下载链接通常与会话绑定，不适合直接用于 CI。建议
 | `ModuleNotFoundError: No module named 'encodings'`（或 `ecdsa` / `jnius`） | 使用了 Ren'Py 的 git checkout。改用官方 SDK 发行包。 |
 | `.../lib/py3-linux-x86_64/renpy does not exist` | 同上，git 树缺少预编译文件。 |
 | Gradle 报 `repository 'maven' was added by initialization script` | 全局 `~/.gradle/init.gradle` 与 AGP 8.13 冲突。使用独立的 `GRADLE_USER_HOME`（`build.sh` 默认如此）。 |
-| 依赖下载过慢 | `update.renpy.org` 对单连接限速。`fetch.py` 默认 16 路并发，可用 `FETCH_CONNECTIONS=32` 提高。 |
+| 依赖下载过慢 | `update.renpy.org` 对单连接限速。`build.sh` 默认以 32 路并发下载，可用 `FETCH_CONNECTIONS` 调整。 |
 
 ## 已知限制
 
